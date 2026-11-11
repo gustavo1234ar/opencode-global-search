@@ -8,6 +8,7 @@ export type SearchInput = {
   session?: string
   role?: string
   limit?: number
+  words?: boolean
 }
 
 export type SearchRow = {
@@ -80,11 +81,14 @@ const STOPWORDS = new Set([
   "or","to","in","on","at","for","with","is","are","was","were","it","this","that",
 ])
 
-function parseQuery(query: string): Unit[] {
+function parseQuery(query: string, words = false): Unit[] {
+  const trimmed = query.trim()
+  if (!words) return trimmed ? [{ value: trimmed, phrase: true }] : []
+
   const units: Unit[] = []
   const re = /"([^"]+)"|(\S+)/g
   let match: RegExpExecArray | null
-  while ((match = re.exec(query))) {
+  while ((match = re.exec(trimmed))) {
     if (match[1] !== undefined) {
       const value = match[1].trim()
       if (value) units.push({ value, phrase: true })
@@ -188,11 +192,11 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const units = parseQuery(query)
+  const units = parseQuery(query, input.words === true)
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
-  const fetch = Math.min(top * 40, 3000)
+  const fetch = Math.min(Math.max(top * 40, 600), 3000)
 
   const open = await loadSqlite()
   const db = open(databasePath())

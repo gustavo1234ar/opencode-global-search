@@ -13,6 +13,7 @@ export const GlobalSearch = Rpc.define({
           session: { type: "string" },
           role: { type: "string" },
           limit: { type: "number" },
+          words: { type: "boolean" },
         },
         required: ["query"],
         additionalProperties: false,

@@ -26,18 +26,20 @@ export default Plugin.define({
       "panel.title": "History",
       "panel.placeholder": "Search all sessions…",
       "panel.button": "Search",
-      "panel.empty": "Type words and press Enter. All words must appear in the same message.",
+      "panel.empty": "Type the exact phrase and press Enter.",
       "panel.none": "No matches.",
       "panel.all": "All sessions",
+      "panel.words": "All words, any order",
     },
     es: {
       "command.open": "Buscar en el historial",
       "panel.title": "Historial",
       "panel.placeholder": "Buscar en todas las sesiones…",
       "panel.button": "Buscar",
-      "panel.empty": "Escribí palabras y Enter. Tienen que aparecer todas en el mismo mensaje.",
+      "panel.empty": "Escribí la frase exacta y Enter.",
       "panel.none": "Sin coincidencias.",
       "panel.all": "Todas las sesiones",
+      "panel.words": "Todas las palabras, sin importar el orden",
     },
   },
   setup(ctx) {
@@ -47,6 +49,7 @@ export default Plugin.define({
     const [text, setText] = createSignal("")
     const [sessions, setSessions] = createSignal<{ id: string; title: string }[]>([])
     const [picked, setPicked] = createSignal("")
+    const [words, setWords] = createSignal(false)
 
     onMount(() => {
       void (async () => {
@@ -66,6 +69,7 @@ export default Plugin.define({
         const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
           query: q,
           limit: 60,
+          words: words(),
           ...(picked() ? { session: picked() } : {}),
         })
         setResults(out?.results ?? [])
@@ -123,7 +127,7 @@ export default Plugin.define({
           </button>
         </div>
 
-        <div style={{ padding: "0 8px 8px" }}>
+        <div style={{ padding: "0 8px 8px", display: "flex", "flex-direction": "column", gap: "6px" }}>
           <select
             value={picked()}
             onChange={(e) => setPicked(e.currentTarget.value)}
@@ -142,6 +146,11 @@ export default Plugin.define({
               {(s) => <option value={s.id}>{s.title || s.id}</option>}
             </For>
           </select>
+
+          <label style={{ display: "flex", "align-items": "center", gap: "6px", color: "#555", "font-size": "12px" }}>
+            <input type="checkbox" checked={words()} onChange={(e) => setWords(e.currentTarget.checked)} />
+            {ctx.t("panel.words")}
+          </label>
         </div>
 
         <div style={{ flex: "1", overflow: "auto", padding: "0 8px 8px", "min-height": "0" }}>
