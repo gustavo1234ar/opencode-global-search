@@ -74,8 +74,8 @@ export default Plugin.define({
               padding: "6px 8px",
               "border-radius": "6px",
               border: "1px solid #3a3a3a",
-              background: "#1b1b1b",
-              color: "#ddd",
+              background: "#ffffff",
+              color: "#111111",
               "font-size": "13px",
             }}
           />
@@ -104,8 +104,11 @@ export default Plugin.define({
             <For each={results()}>
               {(r) => (
                 <div style={{ "border-bottom": "1px solid #262626", padding: "8px 2px" }}>
-                  <div style={{ color: "#8ab", "font-size": "11px" }}>
-                    {date(r.t)} · {r.title ?? "(untitled)"} · {r.role ?? "?"} · {r.sid}
+                  <div style={{ color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={r.sid}>
+                    {r.title || "(untitled)"}
+                  </div>
+                  <div style={{ color: "#666", "font-size": "11px" }}>
+                    {date(r.t)} · {r.role ?? "?"}
                   </div>
                   <div style={{ color: "#bbb", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
                 </div>
