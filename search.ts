@@ -54,6 +54,29 @@ function excerpt(data: string, term: string) {
   return `…${clean(data.slice(start, end))}…`
 }
 
+function visibleText(data: string, type: string | null): string {
+  try {
+    const parsed = JSON.parse(data)
+    if (type === "assistant") {
+      const parts = Array.isArray(parsed?.content) ? parsed.content : []
+      return parts
+        .filter((p: any) => p && p.type === "text" && typeof p.text === "string")
+        .map((p: any) => p.text)
+        .join("\n")
+    }
+    if (typeof parsed?.text === "string") return parsed.text
+    if (typeof parsed?.metadata?.displayText === "string") return parsed.metadata.displayText
+    return ""
+  } catch {
+    return ""
+  }
+}
+
+function matchesAll(text: string, terms: string[]) {
+  const lower = text.toLowerCase()
+  return terms.every((t) => lower.includes(t.toLowerCase()))
+}
+
 export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
   const query = String(input.query ?? "").trim()
   if (!query) return []
@@ -67,6 +90,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
   const terms = query.split(/\s+/).filter(Boolean)
   const patterns = terms.map((t) => `%${t.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
+  const fetch = Math.min(top * 4, 800)
 
   const open = await loadSqlite()
   const db = open(databasePath())
@@ -96,7 +120,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
       } else {
         conditions.push("m.type IN ('user','assistant','synthetic','shell')")
       }
-      params.push(top)
+      params.push(fetch)
 
       const sql = `SELECT m.time_created AS t, m.session_id AS sid, m.type AS role,
                           m.data AS content, s.title AS title
@@ -105,13 +129,17 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
                    WHERE ${conditions.join(" AND ")}
                    ORDER BY m.time_created DESC LIMIT ?`
       const rows = db.prepare(sql).all(...params) as any[]
-      return rows.map((r) => ({
-        t: r.t,
-        sid: r.sid,
-        role: r.role ?? "",
-        title: r.title ?? "",
-        excerpt: excerpt(String(r.content), terms[0]),
-      }))
+      return rows
+        .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
+        .filter((x) => matchesAll(x.text, terms))
+        .slice(0, top)
+        .map((x) => ({
+          t: x.r.t,
+          sid: x.r.sid,
+          role: x.r.role ?? "",
+          title: x.r.title ?? "",
+          excerpt: excerpt(x.text, terms[0]),
+        }))
     }
 
     conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
@@ -130,7 +158,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     } else {
       conditions.push("json_extract(m.data, '$.role') IN ('user','assistant')")
     }
-    params.push(top)
+    params.push(fetch)
 
     const sql = `SELECT p.time_created AS t, p.session_id AS sid,
                         json_extract(m.data, '$.role') AS role,
@@ -141,13 +169,17 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
                  WHERE ${conditions.join(" AND ")}
                  ORDER BY p.time_created DESC LIMIT ?`
     const rows = db.prepare(sql).all(...params) as any[]
-    return rows.map((r) => ({
-      t: r.t,
-      sid: r.sid,
-      role: r.role,
-      title: r.title,
-      excerpt: excerpt(String(r.content), terms[0]),
-    }))
+    return rows
+      .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
+      .filter((x) => matchesAll(x.text, terms))
+      .slice(0, top)
+      .map((x) => ({
+        t: x.r.t,
+        sid: x.r.sid,
+        role: x.r.role ?? "",
+        title: x.r.title ?? "",
+        excerpt: excerpt(x.text, terms[0]),
+      }))
   } finally {
     db.close()
   }

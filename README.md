@@ -5,6 +5,8 @@ Search your entire OpenCode chat history — every session, every project — fr
 It adds one read-only tool, `global_search`, that queries OpenCode's local SQLite database
 (`opencode.db`) and returns the date, session title, role and an excerpt around each match.
 
+Only what you and the assistant actually wrote is searched: reasoning traces and raw tool output are ignored.
+
 Works with the desktop app, the TUI, and any other client, because tools run in the OpenCode server.
 
 ## Install
