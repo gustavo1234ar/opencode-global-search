@@ -44,22 +44,17 @@ export default Plugin.define({
               description: "Restrict to message author",
             },
             limit: { type: "integer", description: "Maximum matches (default 20, max 100)" },
-            words: {
-              type: "boolean",
-              description: "Match all words in any order instead of the exact phrase",
-            },
           },
           required: ["query"],
           additionalProperties: false,
         },
         execute: async (input) => {
-          const { query, since, session, role, limit, words } = input as {
+          const { query, since, session, role, limit } = input as {
             query: string
             since?: string
             session?: string
             role?: string
             limit?: number
-            words?: boolean
           }
 
           const term = String(query ?? "").trim()
@@ -71,7 +66,6 @@ export default Plugin.define({
             session,
             role,
             limit: Math.min(Number(limit) || 20, 100),
-            words: words === true,
           })
 
           if (rows.length === 0) return { content: `No matches for "${term}".` }
@@ -100,7 +94,6 @@ export default Plugin.define({
             session: input?.session,
             role: input?.role,
             limit: Math.min(Math.max(Number(input?.limit) || 50, 1), 200),
-            words: input?.words === true,
           })
           return { results }
         },
@@ -114,7 +107,6 @@ export default Plugin.define({
             since: input?.since,
             session: input?.session,
             role: input?.role,
-            words: input?.words === true,
           })
           return { sessions }
         },

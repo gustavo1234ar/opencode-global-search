@@ -8,7 +8,6 @@ export type SearchInput = {
   session?: string
   role?: string
   limit?: number
-  words?: boolean
 }
 
 export type SearchRow = {
@@ -75,29 +74,9 @@ function visibleText(data: string, type: string | null): string {
 
 type Unit = { value: string; phrase: boolean }
 
-const STOPWORDS = new Set([
-  "de","del","la","las","el","los","un","una","unos","unas","y","o","u","en","al","a","que","con","por","para",
-  "es","son","era","fue","lo","le","les","se","su","sus","mi","mis","tu","tus","no","si","sí","the","of","and",
-  "or","to","in","on","at","for","with","is","are","was","were","it","this","that",
-])
-
-function parseQuery(query: string, words = false): Unit[] {
+function parseQuery(query: string): Unit[] {
   const trimmed = query.trim()
-  if (!words) return trimmed ? [{ value: trimmed, phrase: true }] : []
-
-  const units: Unit[] = []
-  const re = /"([^"]+)"|(\S+)/g
-  let match: RegExpExecArray | null
-  while ((match = re.exec(trimmed))) {
-    if (match[1] !== undefined) {
-      const value = match[1].trim()
-      if (value) units.push({ value, phrase: true })
-    } else if (match[2]) {
-      units.push({ value: match[2], phrase: false })
-    }
-  }
-  const meaningful = units.filter((u) => u.phrase || !STOPWORDS.has(u.value.toLowerCase()))
-  return meaningful.length > 0 ? meaningful : units
+  return trimmed ? [{ value: trimmed, phrase: true }] : []
 }
 
 function termRegex(term: string) {
@@ -184,7 +163,7 @@ export async function searchSessions(input: SearchInput): Promise<SessionGroup[]
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const units = parseQuery(query, input.words === true)
+  const units = parseQuery(query)
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
 
@@ -283,7 +262,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const units = parseQuery(query, input.words === true)
+  const units = parseQuery(query)
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)

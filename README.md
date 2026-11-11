@@ -52,7 +52,6 @@ Keep the panel and hide the tool from the agent:
 
 - **Global search** across every session and project.
 - **Exact phrase by default**, like the built-in `Ctrl+F`: `lenovo 14` matches only that sequence.
-- **All words mode** (optional): every word in any order, ignoring stopwords like `de` or `the`.
 - **Session scoping**: search one session or all of them.
 - **Role filter** and date filter for the tool.
 
@@ -72,7 +71,6 @@ Or call the tool directly:
 | `session` | string | Restrict to one session id (`ses_...`) |
 | `role` | string | `user`, `assistant`, `synthetic` or `shell` |
 | `limit` | integer | Maximum matches (default 20, max 100) |
-| `words` | boolean | Match all words in any order instead of the exact phrase |
 
 ## Output
 

@@ -35,8 +35,6 @@ export default Plugin.define({
       "panel.button": "Search",
       "panel.empty": "Type the exact phrase and press Enter.",
       "panel.none": "No matches.",
-      "panel.all": "All sessions",
-      "panel.words": "All words, any order",
     },
     es: {
       "command.open": "Buscar en el historial",
@@ -45,8 +43,6 @@ export default Plugin.define({
       "panel.button": "Buscar",
       "panel.empty": "Escribí la frase exacta y Enter.",
       "panel.none": "Sin coincidencias.",
-      "panel.all": "Todas las sesiones",
-      "panel.words": "Todas las palabras, sin importar el orden",
     },
   },
   setup(ctx) {
@@ -55,7 +51,6 @@ export default Plugin.define({
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
-    const [words, setWords] = createSignal(false)
     const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
 
     const toggle = async (sid: string) => {
@@ -66,7 +61,6 @@ export default Plugin.define({
         const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
           query: text().trim(),
           session: sid,
-          words: words(),
           limit: 30,
         })
         setSnippets({ ...snippets(), [sid]: out?.results ?? [] })
@@ -85,7 +79,6 @@ export default Plugin.define({
       try {
         const out: any = await (ctx.client as any).rpc(GlobalSearch).groups({
           query: q,
-          words: words(),
         })
         setGroups(out?.sessions ?? [])
       } catch {
@@ -142,13 +135,6 @@ export default Plugin.define({
           </button>
         </div>
 
-        <div style={{ padding: "0 8px 8px" }}>
-          <label style={{ display: "flex", "align-items": "center", gap: "6px", color: "#555", "font-size": "12px" }}>
-            <input type="checkbox" checked={words()} onChange={(e) => setWords(e.currentTarget.checked)} />
-            {ctx.t("panel.words")}
-          </label>
-        </div>
-
         <div style={{ flex: "1", overflow: "auto", padding: "0 8px 8px", "min-height": "0" }}>
           <Show when={groups().length > 0} fallback={
             <div style={{ color: "#666", "font-size": "12px", padding: "12px 4px" }}>
@@ -178,7 +164,7 @@ export default Plugin.define({
                     >
                       {expanded()[g.sid] ? "▾" : "▸"}
                     </button>
-                    <span style={{ flex: "1", color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={g.sid}>
+                    <span style={{ flex: "1", color: "#8ab", "font-size": "12px", "font-weight": "600" }}>
                       {g.title || "(untitled)"}
                     </span>
                     <span style={{ color: "#666", "font-size": "11px" }}>

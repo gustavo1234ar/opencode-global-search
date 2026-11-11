@@ -1,6 +1,6 @@
 {
   "name": "opencode-global-search",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Full-text search across OpenCode chat history (all sessions and projects)",
   "type": "module",
   "exports": {
