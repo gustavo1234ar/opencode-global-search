@@ -35,6 +35,7 @@ export default Plugin.define({
       "panel.button": "Search",
       "panel.empty": "Type the exact phrase and press Enter.",
       "panel.none": "No matches.",
+      "panel.hidden": "Match is inside tool output or reasoning, not in the visible text.",
     },
     es: {
       "command.open": "Buscar en el historial",
@@ -43,6 +44,7 @@ export default Plugin.define({
       "panel.button": "Buscar",
       "panel.empty": "Escribí la frase exacta y Enter.",
       "panel.none": "Sin coincidencias.",
+      "panel.hidden": "La coincidencia está en la salida de una tool o en el razonamiento, no en el texto visible.",
     },
   },
   setup(ctx) {
@@ -183,6 +185,11 @@ export default Plugin.define({
                           </div>
                         )}
                       </For>
+                      <Show when={snippets()[g.sid]?.length === 0}>
+                        <div style={{ padding: "4px 2px 4px 20px", color: "#777", "font-size": "11px" }}>
+                          {ctx.t("panel.hidden")}
+                        </div>
+                      </Show>
                     </div>
                   </Show>
                 </div>

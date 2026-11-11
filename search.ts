@@ -179,8 +179,17 @@ export async function searchSessions(input: SearchInput): Promise<SessionGroup[]
     const params: any[] = []
 
     if (v2) {
-      conditions.push(patterns.map(() => "m.data LIKE ? ESCAPE '\\'").join(" AND "))
-      params.push(...patterns)
+      const clauses = patterns.map(
+        () =>
+          `((m.type = 'user' AND json_extract(m.data, '$.text') LIKE ? ESCAPE '\\')
+         OR (m.type = 'assistant' AND EXISTS (
+               SELECT 1 FROM json_each(m.data, '$.content') j
+               WHERE json_extract(j.value, '$.type') = 'text'
+                 AND json_extract(j.value, '$.text') LIKE ? ESCAPE '\\'))
+         OR (m.type IN ('synthetic','shell') AND json_extract(m.data, '$.text') LIKE ? ESCAPE '\\'))`,
+      )
+      conditions.push(`(${clauses.join(" AND ")})`)
+      for (const p of patterns) params.push(p, p, p)
       if (sinceMs !== undefined) {
         conditions.push("m.time_created >= ?")
         params.push(sinceMs)
@@ -206,6 +215,7 @@ export async function searchSessions(input: SearchInput): Promise<SessionGroup[]
       return rows.map((r) => ({ sid: r.sid, title: r.title ?? "", count: r.n, last: r.last }))
     }
 
+    conditions.push("json_extract(p.data, '$.type') = 'text'")
     conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
     params.push(...patterns)
     if (sinceMs !== undefined) {
