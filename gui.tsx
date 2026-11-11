@@ -116,7 +116,7 @@ export default Plugin.define({
               {(r) => (
                 <div
                   onClick={() => openSession(r.sid)}
-                  style={{ "border-bottom": "1px solid #262626", padding: "8px 2px", cursor: "pointer" }}
+                  style={{ "border-bottom": "1px solid rgba(128,128,128,0.30)", padding: "8px 2px", cursor: "pointer" }}
                 >
                   <div style={{ color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={r.sid}>
                     {r.title || "(untitled)"}
@@ -124,7 +124,7 @@ export default Plugin.define({
                   <div style={{ color: "#666", "font-size": "11px" }}>
                     {date(r.t)} · {r.role ?? "?"}
                   </div>
-                  <div style={{ color: "#bbb", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
+                  <div style={{ color: "#333333", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
                 </div>
               )}
             </For>
