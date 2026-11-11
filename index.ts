@@ -111,7 +111,8 @@ export default Plugin.define({
             if (Number.isNaN(sinceMs)) return { content: `Invalid date: ${since} (use YYYY-MM-DD).` }
           }
 
-          const pattern = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+          const terms = term.split(/\s+/).filter(Boolean)
+          const patterns = terms.map((t) => `%${t.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
           const top = Math.min(Math.max(Number(limit) || 20, 1), 100)
 
           const db = open(databasePath())
@@ -125,8 +126,8 @@ export default Plugin.define({
             const params: any[] = []
 
             if (v2) {
-              conditions.push("m.data LIKE ? ESCAPE '\\'")
-              params.push(pattern)
+              conditions.push(patterns.map(() => "m.data LIKE ? ESCAPE '\\'").join(" AND "))
+              params.push(...patterns)
               if (sinceMs !== undefined) {
                 conditions.push("m.time_created >= ?")
                 params.push(sinceMs)
@@ -151,8 +152,8 @@ export default Plugin.define({
                            ORDER BY m.time_created DESC LIMIT ?`
               rows = db.prepare(sql).all(...params) as Row[]
             } else {
-              conditions.push("p.data LIKE ? ESCAPE '\\'")
-              params.push(pattern)
+              conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
+              params.push(...patterns)
               if (sinceMs !== undefined) {
                 conditions.push("p.time_created >= ?")
                 params.push(sinceMs)
@@ -189,7 +190,7 @@ export default Plugin.define({
           const lines = rows.map((r) => {
             const who = ROLE_LABEL[r.role ?? ""] ?? r.role ?? "unknown"
             const title = (r.title ?? "(untitled)").replace(/\s+/g, " ").slice(0, 60)
-            return `${formatDate(r.t)} · ${title} · [${who}] · ${r.sid}\n   ${excerpt(r.content, term)}`
+            return `${formatDate(r.t)} · ${title} · [${who}] · ${r.sid}\n   ${excerpt(r.content, terms[0])}`
           })
 
           return {

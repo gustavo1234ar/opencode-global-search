@@ -35,7 +35,7 @@ Or call the tool directly:
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `query` | string (required) | Text to search for, case-insensitive |
+| `query` | string (required) | Words to search for, case-insensitive. Multiple words must all appear |
 | `since` | string | Earliest date, `YYYY-MM-DD` |
 | `session` | string | Restrict to one session id (`ses_...`) |
 | `role` | string | `user`, `assistant`, `synthetic` or `shell` |
@@ -44,10 +44,10 @@ Or call the tool directly:
 ## Output
 
 ```
-3 match(es) in 1 session(s) for "NOBLEX":
+3 match(es) in 1 session(s) for "postgres backup":
 
-2026-11-08 20:11 · visor tablet · [assistant] · ses_e431f11a5ffeMuYIsTVjIYww6D
-   …Intel Medfield reference tablet… this is NOBLEX-specific hardware…
+2026-03-14 18:02 · Database migration · [user] · ses_example000000000000000000
+   …we should test the postgres backup script before touching production…
 ```
 
 ## Compatibility
@@ -98,7 +98,7 @@ devuelve fecha, título de la sesión, autor y un fragmento alrededor de cada co
 
 | Parámetro | Tipo | Descripción |
 | --- | --- | --- |
-| `query` | string (obligatorio) | Texto a buscar, sin distinguir mayúsculas |
+| `query` | string (obligatorio) | Palabras a buscar, sin distinguir mayúsculas. Con varias, deben aparecer todas |
 | `since` | string | Fecha mínima, `YYYY-MM-DD` |
 | `session` | string | Limitar a una sesión (`ses_...`) |
 | `role` | string | `user`, `assistant`, `synthetic` o `shell` |
