@@ -88,7 +88,9 @@ export async function listSessions(limit = 300): Promise<SessionOption[]> {
   const db = open(databasePath())
   try {
     const rows = db
-      .prepare("SELECT id, title, time_updated AS updated FROM session_v2 ORDER BY time_updated DESC LIMIT ?")
+      .prepare(
+        "SELECT id, title, time_updated AS updated FROM session_v2 WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT ?",
+      )
       .all(Math.min(Math.max(limit, 1), 1000)) as any[]
     return rows.map((r) => ({ id: r.id, title: r.title ?? "", updated: r.updated }))
   } finally {
