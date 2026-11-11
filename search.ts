@@ -47,15 +47,10 @@ function clean(text: string) {
 }
 
 function excerpt(data: string, units: Unit[]) {
-  let i = -1
-  const lower = data.toLowerCase()
-  for (const unit of units) {
-    const found = unit.phrase ? lower.indexOf(unit.value.toLowerCase()) : termRegex(unit.value).exec(data)?.index ?? -1
-    if (found >= 0 && (i < 0 || found < i)) i = found
-  }
-  if (i < 0) return clean(data.slice(0, 240))
-  const start = Math.max(0, i - 140)
-  const end = Math.min(data.length, i + 180)
+  const found = locate(data, units)
+  if (!found) return clean(data.slice(0, 240))
+  const start = Math.max(0, found.start - 120)
+  const end = Math.min(data.length, found.end + 160)
   return `…${clean(data.slice(start, end))}…`
 }
 
@@ -79,6 +74,12 @@ function visibleText(data: string, type: string | null): string {
 
 type Unit = { value: string; phrase: boolean }
 
+const STOPWORDS = new Set([
+  "de","del","la","las","el","los","un","una","unos","unas","y","o","u","en","al","a","que","con","por","para",
+  "es","son","era","fue","lo","le","les","se","su","sus","mi","mis","tu","tus","no","si","sí","the","of","and",
+  "or","to","in","on","at","for","with","is","are","was","were","it","this","that",
+])
+
 function parseQuery(query: string): Unit[] {
   const units: Unit[] = []
   const re = /"([^"]+)"|(\S+)/g
@@ -91,7 +92,8 @@ function parseQuery(query: string): Unit[] {
       units.push({ value: match[2], phrase: false })
     }
   }
-  return units
+  const meaningful = units.filter((u) => u.phrase || !STOPWORDS.has(u.value.toLowerCase()))
+  return meaningful.length > 0 ? meaningful : units
 }
 
 function termRegex(term: string) {
@@ -99,11 +101,61 @@ function termRegex(term: string) {
   return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "iu")
 }
 
+function occurrences(text: string, unit: Unit): number[] {
+  const out: number[] = []
+  if (unit.phrase) {
+    const lower = text.toLowerCase()
+    const needle = unit.value.toLowerCase()
+    let i = lower.indexOf(needle)
+    while (i >= 0 && out.length < 40) {
+      out.push(i)
+      i = lower.indexOf(needle, i + needle.length)
+    }
+    return out
+  }
+  const re = new RegExp(termRegex(unit.value).source, "giu")
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) && out.length < 40) {
+    out.push(m.index)
+    re.lastIndex = m.index + Math.max(1, m[0].length)
+  }
+  return out
+}
+
+const MAX_SPAN = 600
+
+function locate(text: string, units: Unit[]): { start: number; end: number; span: number } | null {
+  const all: { at: number; len: number; unit: number }[] = []
+  units.forEach((u, idx) => {
+    for (const at of occurrences(text, u)) {
+      all.push({ at, len: u.value.length, unit: idx })
+    }
+  })
+  if (all.length === 0) return null
+  all.sort((a, b) => a.at - b.at)
+
+  const counts = new Array(units.length).fill(0)
+  let have = 0
+  let left = 0
+  let best: { start: number; end: number; span: number } | null = null
+
+  for (let right = 0; right < all.length; right++) {
+    if (counts[all[right].unit]++ === 0) have++
+    while (have === units.length) {
+      const start = all[left].at
+      const end = all[right].at + all[right].len
+      const span = end - start
+      if (!best || span < best.span) best = { start, end, span }
+      if (--counts[all[left].unit] === 0) have--
+      left++
+    }
+  }
+  return best
+}
+
 function matchesAll(text: string, units: Unit[]) {
-  const lower = text.toLowerCase()
-  return units.every((u) =>
-    u.phrase ? lower.includes(u.value.toLowerCase()) : termRegex(u.value).test(text),
-  )
+  const found = locate(text, units)
+  return found !== null && (units.length === 1 || found.span <= MAX_SPAN)
 }
 
 export type SessionOption = {
