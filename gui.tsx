@@ -1,5 +1,5 @@
 import { Command, Panel, Plugin } from "@opencode/plugin/gui"
-import { For, Show, createSignal, onMount } from "solid-js"
+import { For, Show, createSignal } from "solid-js"
 import { GlobalSearch } from "./rpc.js"
 
 type Row = {
@@ -55,8 +55,6 @@ export default Plugin.define({
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
-    const [sessions, setSessions] = createSignal<{ id: string; title: string }[]>([])
-    const [picked, setPicked] = createSignal("")
     const [words, setWords] = createSignal(false)
     const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
 
@@ -77,15 +75,6 @@ export default Plugin.define({
       }
     }
 
-    onMount(() => {
-      void (async () => {
-        try {
-          const out: any = await (ctx.client as any).rpc(GlobalSearch).sessions({ limit: 300 })
-          setSessions(out?.sessions ?? [])
-        } catch {}
-      })()
-    })
-
     const run = async (query: string) => {
       const q = query.trim()
       if (!q) return
@@ -97,7 +86,6 @@ export default Plugin.define({
         const out: any = await (ctx.client as any).rpc(GlobalSearch).groups({
           query: q,
           words: words(),
-          ...(picked() ? { session: picked() } : {}),
         })
         setGroups(out?.sessions ?? [])
       } catch {
@@ -154,26 +142,7 @@ export default Plugin.define({
           </button>
         </div>
 
-        <div style={{ padding: "0 8px 8px", display: "flex", "flex-direction": "column", gap: "6px" }}>
-          <select
-            value={picked()}
-            onChange={(e) => setPicked(e.currentTarget.value)}
-            style={{
-              width: "100%",
-              padding: "5px 6px",
-              "border-radius": "6px",
-              border: "1px solid #3a3a3a",
-              background: "#ffffff",
-              color: "#111111",
-              "font-size": "12px",
-            }}
-          >
-            <option value="">{ctx.t("panel.all")}</option>
-            <For each={sessions()}>
-              {(s) => <option value={s.id}>{s.title || s.id}</option>}
-            </For>
-          </select>
-
+        <div style={{ padding: "0 8px 8px" }}>
           <label style={{ display: "flex", "align-items": "center", gap: "6px", color: "#555", "font-size": "12px" }}>
             <input type="checkbox" checked={words()} onChange={(e) => setWords(e.currentTarget.checked)} />
             {ctx.t("panel.words")}
