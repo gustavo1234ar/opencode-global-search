@@ -46,11 +46,15 @@ function clean(text: string) {
     .trim()
 }
 
-function excerpt(data: string, term: string) {
-  const i = data.toLowerCase().indexOf(term.toLowerCase())
+function excerpt(data: string, terms: string[]) {
+  let i = -1
+  for (const term of terms) {
+    const found = termRegex(term, "iu").exec(data)
+    if (found && (i < 0 || found.index < i)) i = found.index
+  }
   if (i < 0) return clean(data.slice(0, 240))
   const start = Math.max(0, i - 140)
-  const end = Math.min(data.length, i + term.length + 160)
+  const end = Math.min(data.length, i + 180)
   return `…${clean(data.slice(start, end))}…`
 }
 
@@ -72,9 +76,13 @@ function visibleText(data: string, type: string | null): string {
   }
 }
 
+function termRegex(term: string, flags: string) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, flags)
+}
+
 function matchesAll(text: string, terms: string[]) {
-  const lower = text.toLowerCase()
-  return terms.every((t) => lower.includes(t.toLowerCase()))
+  return terms.every((t) => termRegex(t, "iu").test(text))
 }
 
 export type SessionOption = {
@@ -159,7 +167,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
           sid: x.r.sid,
           role: x.r.role ?? "",
           title: x.r.title ?? "",
-          excerpt: excerpt(x.text, terms[0]),
+          excerpt: excerpt(x.text, terms),
         }))
     }
 
