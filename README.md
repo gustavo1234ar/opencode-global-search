@@ -26,6 +26,15 @@ For a local checkout:
 }
 ```
 
+## Features
+
+- **Global search** across every session and project.
+- **Whole words** by default: `prime` does not match `primero`.
+- **Quoted phrases**: `"lenovo 14w"` matches the exact phrase.
+- **Session scoping**: search one session or all of them.
+- **Desktop panel**: press `Ctrl+Shift+H` (or pick *Search chat history* in the palette) to search from the app, without the model.
+- **Role filter** and date filter for the tool.
+
 ## Usage
 
 Ask in plain language:
@@ -37,7 +46,7 @@ Or call the tool directly:
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `query` | string (required) | Words to search for, case-insensitive. Multiple words must all appear |
+| `query` | string (required) | Words to search for, whole words, case-insensitive. Quote a phrase to match it exactly |
 | `since` | string | Earliest date, `YYYY-MM-DD` |
 | `session` | string | Restrict to one session id (`ses_...`) |
 | `role` | string | `user`, `assistant`, `synthetic` or `shell` |
@@ -100,7 +109,7 @@ devuelve fecha, título de la sesión, autor y un fragmento alrededor de cada co
 
 | Parámetro | Tipo | Descripción |
 | --- | --- | --- |
-| `query` | string (obligatorio) | Palabras a buscar, sin distinguir mayúsculas. Con varias, deben aparecer todas |
+| `query` | string (obligatorio) | Palabras a buscar, completas, sin distinguir mayúsculas. Entre comillas, frase exacta |
 | `since` | string | Fecha mínima, `YYYY-MM-DD` |
 | `session` | string | Limitar a una sesión (`ses_...`) |
 | `role` | string | `user`, `assistant`, `synthetic` o `shell` |
