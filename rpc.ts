@@ -4,6 +4,7 @@ export const GlobalSearch = Rpc.define({
   id: "global-search",
   methods: {
     search: {
+      errors: {},
       input: {
         type: "object",
         properties: {
@@ -26,8 +27,8 @@ export const GlobalSearch = Rpc.define({
               properties: {
                 t: { type: "number" },
                 sid: { type: "string" },
-                role: { type: ["string", "null"] },
-                title: { type: ["string", "null"] },
+                role: { type: "string" },
+                title: { type: "string" },
                 excerpt: { type: "string" },
               },
               required: ["t", "sid", "role", "title", "excerpt"],
@@ -40,4 +41,5 @@ export const GlobalSearch = Rpc.define({
       },
     },
   },
+  events: {},
 })

@@ -108,8 +108,8 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
       return rows.map((r) => ({
         t: r.t,
         sid: r.sid,
-        role: r.role,
-        title: r.title,
+        role: r.role ?? "",
+        title: r.title ?? "",
         excerpt: excerpt(String(r.content), terms[0]),
       }))
     }

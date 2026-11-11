@@ -81,17 +81,21 @@ export default Plugin.define({
       })
     })
 
-    await ctx.rpc.register(GlobalSearch, {
-      search: async (input: any) => {
-        const results = await searchRows({
-          query: String(input?.query ?? ""),
-          since: input?.since,
-          session: input?.session,
-          role: input?.role,
-          limit: Math.min(Math.max(Number(input?.limit) || 50, 1), 200),
-        })
-        return { results }
-      },
-    })
+    try {
+      await ctx.rpc.register(GlobalSearch, {
+        search: async (input: any) => {
+          const results = await searchRows({
+            query: String(input?.query ?? ""),
+            since: input?.since,
+            session: input?.session,
+            role: input?.role,
+            limit: Math.min(Math.max(Number(input?.limit) || 50, 1), 200),
+          })
+          return { results }
+        },
+      })
+    } catch (error) {
+      console.error("[global-search] rpc register failed:", error)
+    }
   },
 })
