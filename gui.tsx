@@ -55,7 +55,7 @@ export default Plugin.define({
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
-    const [exact, setExact] = createSignal(true)
+    const [exact, setExact] = createSignal(false)
     const [lastQuery, setLastQuery] = createSignal("")
     const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
 
