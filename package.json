@@ -1,0 +1,30 @@
+{
+  "name": "opencode-global-search",
+  "version": "0.1.0",
+  "description": "Full-text search across OpenCode chat history (all sessions and projects)",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "search",
+    "history",
+    "sessions",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gustavo1234ar/opencode-global-search.git"
+  },
+  "dependencies": {
+    "@opencode/plugin": "^2.2.7"
+  }
+}
