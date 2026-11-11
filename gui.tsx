@@ -174,6 +174,7 @@ export default Plugin.define({
     ctx.add(Command, () => ({
       id: "open",
       title: ctx.t("command.open"),
+      bind: "mod+shift+h",
       run: () => {
         const session = (ctx as any).sessions.current()
         if (session) (ctx as any).layout.open(`${ctx.id}:main`, session)
