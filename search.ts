@@ -141,7 +141,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
-  const fetch = Math.min(top * 4, 800)
+  const fetch = Math.min(top * 40, 3000)
 
   const open = await loadSqlite()
   const db = open(databasePath())

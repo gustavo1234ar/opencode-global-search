@@ -19,7 +19,10 @@ function formatDate(ms: number) {
 export default Plugin.define({
   id: "global-search",
   async setup(ctx) {
-    await ctx.tool.transform((editor) => {
+    const exposeTool = (ctx.options as any)?.tool !== false
+
+    if (exposeTool) {
+      await ctx.tool.transform((editor) => {
       editor.namespace({
         name: "global",
         description: "Full-text search across OpenCode chat history",
@@ -79,7 +82,8 @@ export default Plugin.define({
           }
         },
       })
-    })
+      })
+    }
 
     try {
       await ctx.rpc.register(GlobalSearch, {

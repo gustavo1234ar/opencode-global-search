@@ -1,13 +1,18 @@
 # opencode-global-search
 
-Search your entire OpenCode chat history — every session, every project — from inside OpenCode.
+Search your entire OpenCode chat history — every session, every project — inside OpenCode.
 
-It adds one read-only tool, `global_search`, that queries OpenCode's local SQLite database
-(`opencode.db`) and returns the date, session title, role and an excerpt around each match.
+It has two parts, and they are independent:
+
+| Part | Where | Uses the model? |
+| --- | --- | --- |
+| **Search panel** (main) | OpenCode Desktop only | No: zero tokens |
+| **`global_search` tool** (optional) | Any client (desktop, TUI, web, IDE) | Yes: the agent calls it |
+
+The panel is the product: press `Ctrl+Shift+H`, type, and read the results.
+The tool is a bonus so the agent can search your history too; you can turn it off.
 
 Only what you and the assistant actually wrote is searched: reasoning traces and raw tool output are ignored.
-
-Works with the desktop app, the TUI, and any other client, because tools run in the OpenCode server.
 
 ## Install
 
@@ -26,16 +31,32 @@ For a local checkout:
 }
 ```
 
+### Disable the tool
+
+Keep the panel and hide the tool from the agent:
+
+```jsonc
+{
+  "plugins": [{ "package": "opencode-global-search", "options": { "tool": false } }]
+}
+```
+
+## The search panel (desktop app)
+
+- Open it with `Ctrl+Shift+H`, or pick **Search chat history** in the command palette.
+- Choose all sessions or a single one.
+- Results open that session in a tab when clicked.
+- No model is involved: nothing is sent to a provider and no tokens are spent.
+
 ## Features
 
 - **Global search** across every session and project.
 - **Whole words** by default: `prime` does not match `primero`.
 - **Quoted phrases**: `"lenovo 14w"` matches the exact phrase.
 - **Session scoping**: search one session or all of them.
-- **Desktop panel**: press `Ctrl+Shift+H` (or pick *Search chat history* in the palette) to search from the app, without the model.
 - **Role filter** and date filter for the tool.
 
-## Usage
+## Usage (tool)
 
 Ask in plain language:
 
@@ -90,8 +111,17 @@ MIT
 
 Búsqueda de texto completo en todo el historial de chats de OpenCode, desde adentro de OpenCode.
 
-Agrega una tool de solo lectura, `global_search`, que consulta la base local (`opencode.db`) y
-devuelve fecha, título de la sesión, autor y un fragmento alrededor de cada coincidencia.
+Tiene dos partes independientes:
+
+| Parte | Dónde | ¿Usa el modelo? |
+| --- | --- | --- |
+| **Panel de búsqueda** (principal) | Solo app de escritorio | No: cero créditos |
+| **Tool `global_search`** (opcional) | Cualquier cliente (app, TUI, web, IDE) | Sí: la llama el agente |
+
+El panel es el producto: `Ctrl+Shift+H`, escribís y ves los resultados.
+La tool es un extra para que el agente también pueda buscar; se puede apagar.
+
+Solo se busca lo que escribiste vos y lo que respondió el agente: se ignoran el razonamiento y la salida cruda de las tools.
 
 ## Instalación
 
@@ -102,7 +132,24 @@ devuelve fecha, título de la sesión, autor y un fragmento alrededor de cada co
 }
 ```
 
-## Uso
+### Apagar la tool
+
+Dejá el panel y ocultale la tool al agente:
+
+```jsonc
+{
+  "plugins": [{ "package": "opencode-global-search", "options": { "tool": false } }]
+}
+```
+
+## El panel (app de escritorio)
+
+- Se abre con `Ctrl+Shift+H` o desde el palette: **Buscar en el historial**.
+- Elegís todas las sesiones o una sola.
+- Al hacer clic en un resultado, abre esa sesión en una pestaña.
+- No interviene el modelo: no se envía nada a ningún proveedor ni se gastan tokens.
+
+## Uso de la tool
 
 - "Buscá en el historial dónde hablé de la tablet"
 - "En qué sesión mencioné rate limiting"
