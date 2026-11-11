@@ -46,11 +46,12 @@ function clean(text: string) {
     .trim()
 }
 
-function excerpt(data: string, terms: string[]) {
+function excerpt(data: string, units: Unit[]) {
   let i = -1
-  for (const term of terms) {
-    const found = termRegex(term, "iu").exec(data)
-    if (found && (i < 0 || found.index < i)) i = found.index
+  const lower = data.toLowerCase()
+  for (const unit of units) {
+    const found = unit.phrase ? lower.indexOf(unit.value.toLowerCase()) : termRegex(unit.value).exec(data)?.index ?? -1
+    if (found >= 0 && (i < 0 || found < i)) i = found
   }
   if (i < 0) return clean(data.slice(0, 240))
   const start = Math.max(0, i - 140)
@@ -76,13 +77,33 @@ function visibleText(data: string, type: string | null): string {
   }
 }
 
-function termRegex(term: string, flags: string) {
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, flags)
+type Unit = { value: string; phrase: boolean }
+
+function parseQuery(query: string): Unit[] {
+  const units: Unit[] = []
+  const re = /"([^"]+)"|(\S+)/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(query))) {
+    if (match[1] !== undefined) {
+      const value = match[1].trim()
+      if (value) units.push({ value, phrase: true })
+    } else if (match[2]) {
+      units.push({ value: match[2], phrase: false })
+    }
+  }
+  return units
 }
 
-function matchesAll(text: string, terms: string[]) {
-  return terms.every((t) => termRegex(t, "iu").test(text))
+function termRegex(term: string) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "iu")
+}
+
+function matchesAll(text: string, units: Unit[]) {
+  const lower = text.toLowerCase()
+  return units.every((u) =>
+    u.phrase ? lower.includes(u.value.toLowerCase()) : termRegex(u.value).test(text),
+  )
 }
 
 export type SessionOption = {
@@ -116,8 +137,9 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const terms = query.split(/\s+/).filter(Boolean)
-  const patterns = terms.map((t) => `%${t.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+  const units = parseQuery(query)
+  if (units.length === 0) return []
+  const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
   const fetch = Math.min(top * 4, 800)
 
@@ -160,14 +182,14 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
       const rows = db.prepare(sql).all(...params) as any[]
       return rows
         .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
-        .filter((x) => matchesAll(x.text, terms))
+        .filter((x) => matchesAll(x.text, units))
         .slice(0, top)
         .map((x) => ({
           t: x.r.t,
           sid: x.r.sid,
           role: x.r.role ?? "",
           title: x.r.title ?? "",
-          excerpt: excerpt(x.text, terms),
+          excerpt: excerpt(x.text, units),
         }))
     }
 
@@ -200,14 +222,14 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     const rows = db.prepare(sql).all(...params) as any[]
     return rows
       .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
-      .filter((x) => matchesAll(x.text, terms))
+      .filter((x) => matchesAll(x.text, units))
       .slice(0, top)
       .map((x) => ({
         t: x.r.t,
         sid: x.r.sid,
         role: x.r.role ?? "",
         title: x.r.title ?? "",
-        excerpt: excerpt(x.text, terms[0]),
+        excerpt: excerpt(x.text, units),
       }))
   } finally {
     db.close()
