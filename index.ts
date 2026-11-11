@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin"
-import { searchRows } from "./search.js"
+import { searchRows, listSessions } from "./search.js"
 import { GlobalSearch } from "./rpc.js"
 
 const ROLE_LABEL: Record<string, string> = {
@@ -92,6 +92,10 @@ export default Plugin.define({
             limit: Math.min(Math.max(Number(input?.limit) || 50, 1), 200),
           })
           return { results }
+        },
+        sessions: async (input: any) => {
+          const sessions = await listSessions(Math.min(Math.max(Number(input?.limit) || 300, 1), 1000))
+          return { sessions }
         },
       })
     } catch (error) {

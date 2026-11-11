@@ -40,6 +40,34 @@ export const GlobalSearch = Rpc.define({
         additionalProperties: false,
       },
     },
+    sessions: {
+      errors: {},
+      input: {
+        type: "object",
+        properties: { limit: { type: "number" } },
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          sessions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                title: { type: "string" },
+                updated: { type: "number" },
+              },
+              required: ["id", "title", "updated"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["sessions"],
+        additionalProperties: false,
+      },
+    },
   },
   events: {},
 })

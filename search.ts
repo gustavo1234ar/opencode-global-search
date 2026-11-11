@@ -77,6 +77,25 @@ function matchesAll(text: string, terms: string[]) {
   return terms.every((t) => lower.includes(t.toLowerCase()))
 }
 
+export type SessionOption = {
+  id: string
+  title: string
+  updated: number
+}
+
+export async function listSessions(limit = 300): Promise<SessionOption[]> {
+  const open = await loadSqlite()
+  const db = open(databasePath())
+  try {
+    const rows = db
+      .prepare("SELECT id, title, time_updated AS updated FROM session_v2 ORDER BY time_updated DESC LIMIT ?")
+      .all(Math.min(Math.max(limit, 1), 1000)) as any[]
+    return rows.map((r) => ({ id: r.id, title: r.title ?? "", updated: r.updated }))
+  } finally {
+    db.close()
+  }
+}
+
 export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
   const query = String(input.query ?? "").trim()
   if (!query) return []

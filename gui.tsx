@@ -1,5 +1,5 @@
 import { Command, Panel, Plugin } from "@opencode/plugin/gui"
-import { For, Show, createSignal } from "solid-js"
+import { For, Show, createSignal, onMount } from "solid-js"
 import { GlobalSearch } from "./rpc.js"
 
 type Row = {
@@ -28,6 +28,7 @@ export default Plugin.define({
       "panel.button": "Search",
       "panel.empty": "Type words and press Enter. All words must appear in the same message.",
       "panel.none": "No matches.",
+      "panel.all": "All sessions",
     },
     es: {
       "command.open": "Buscar en el historial",
@@ -36,6 +37,7 @@ export default Plugin.define({
       "panel.button": "Buscar",
       "panel.empty": "Escribí palabras y Enter. Tienen que aparecer todas en el mismo mensaje.",
       "panel.none": "Sin coincidencias.",
+      "panel.all": "Todas las sesiones",
     },
   },
   setup(ctx) {
@@ -43,6 +45,17 @@ export default Plugin.define({
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
+    const [sessions, setSessions] = createSignal<{ id: string; title: string }[]>([])
+    const [picked, setPicked] = createSignal("")
+
+    onMount(() => {
+      void (async () => {
+        try {
+          const out: any = await (ctx.client as any).rpc(GlobalSearch).sessions({ limit: 300 })
+          setSessions(out?.sessions ?? [])
+        } catch {}
+      })()
+    })
 
     const run = async (query: string) => {
       const q = query.trim()
@@ -50,7 +63,11 @@ export default Plugin.define({
       setBusy(true)
       setTouched(true)
       try {
-        const out: any = await (ctx.client as any).rpc(GlobalSearch).search({ query: q, limit: 60 })
+        const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
+          query: q,
+          limit: 60,
+          ...(picked() ? { session: picked() } : {}),
+        })
         setResults(out?.results ?? [])
       } catch {
         setResults([])
@@ -104,6 +121,27 @@ export default Plugin.define({
           >
             {ctx.t("panel.button")}
           </button>
+        </div>
+
+        <div style={{ padding: "0 8px 8px" }}>
+          <select
+            value={picked()}
+            onChange={(e) => setPicked(e.currentTarget.value)}
+            style={{
+              width: "100%",
+              padding: "5px 6px",
+              "border-radius": "6px",
+              border: "1px solid #3a3a3a",
+              background: "#ffffff",
+              color: "#111111",
+              "font-size": "12px",
+            }}
+          >
+            <option value="">{ctx.t("panel.all")}</option>
+            <For each={sessions()}>
+              {(s) => <option value={s.id}>{s.title || s.id}</option>}
+            </For>
+          </select>
         </div>
 
         <div style={{ flex: "1", overflow: "auto", padding: "0 8px 8px", "min-height": "0" }}>
