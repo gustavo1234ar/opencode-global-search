@@ -69,6 +69,42 @@ export const GlobalSearch = Rpc.define({
         additionalProperties: false,
       },
     },
+    groups: {
+      errors: {},
+      input: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          since: { type: "string" },
+          session: { type: "string" },
+          role: { type: "string" },
+          words: { type: "boolean" },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          sessions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                sid: { type: "string" },
+                title: { type: "string" },
+                count: { type: "number" },
+                last: { type: "number" },
+              },
+              required: ["sid", "title", "count", "last"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["sessions"],
+        additionalProperties: false,
+      },
+    },
   },
   events: {},
 })

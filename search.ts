@@ -167,6 +167,97 @@ export type SessionOption = {
   updated: number
 }
 
+export type SessionGroup = {
+  sid: string
+  title: string
+  count: number
+  last: number
+}
+
+export async function searchSessions(input: SearchInput): Promise<SessionGroup[]> {
+  const query = String(input.query ?? "").trim()
+  if (!query) return []
+
+  let sinceMs: number | undefined
+  if (input.since) {
+    sinceMs = Date.parse(`${input.since}T00:00:00`)
+    if (Number.isNaN(sinceMs)) return []
+  }
+
+  const units = parseQuery(query, input.words === true)
+  if (units.length === 0) return []
+  const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+
+  const open = await loadSqlite()
+  const db = open(databasePath())
+
+  try {
+    const v2 = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='session_message'")
+      .get()
+
+    const conditions: string[] = []
+    const params: any[] = []
+
+    if (v2) {
+      conditions.push(patterns.map(() => "m.data LIKE ? ESCAPE '\\'").join(" AND "))
+      params.push(...patterns)
+      if (sinceMs !== undefined) {
+        conditions.push("m.time_created >= ?")
+        params.push(sinceMs)
+      }
+      if (input.session) {
+        conditions.push("m.session_id = ?")
+        params.push(input.session)
+      }
+      if (input.role) {
+        conditions.push("m.type = ?")
+        params.push(input.role)
+      } else {
+        conditions.push("m.type IN ('user','assistant','synthetic','shell')")
+      }
+
+      const sql = `SELECT m.session_id AS sid, COUNT(*) AS n, MAX(m.time_created) AS last, s.title AS title
+                   FROM session_message m
+                   LEFT JOIN session_v2 s ON s.id = m.session_id
+                   WHERE ${conditions.join(" AND ")}
+                   GROUP BY m.session_id
+                   ORDER BY n DESC, last DESC`
+      const rows = db.prepare(sql).all(...params) as any[]
+      return rows.map((r) => ({ sid: r.sid, title: r.title ?? "", count: r.n, last: r.last }))
+    }
+
+    conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
+    params.push(...patterns)
+    if (sinceMs !== undefined) {
+      conditions.push("p.time_created >= ?")
+      params.push(sinceMs)
+    }
+    if (input.session) {
+      conditions.push("p.session_id = ?")
+      params.push(input.session)
+    }
+    if (input.role) {
+      conditions.push("json_extract(m.data, '$.role') = ?")
+      params.push(input.role)
+    } else {
+      conditions.push("json_extract(m.data, '$.role') IN ('user','assistant')")
+    }
+
+    const sql = `SELECT p.session_id AS sid, COUNT(*) AS n, MAX(p.time_created) AS last, s.title AS title
+                 FROM part p
+                 JOIN message m ON m.id = p.message_id
+                 LEFT JOIN session s ON s.id = p.session_id
+                 WHERE ${conditions.join(" AND ")}
+                 GROUP BY p.session_id
+                 ORDER BY n DESC, last DESC`
+    const rows = db.prepare(sql).all(...params) as any[]
+    return rows.map((r) => ({ sid: r.sid, title: r.title ?? "", count: r.n, last: r.last }))
+  } finally {
+    db.close()
+  }
+}
+
 export async function listSessions(limit = 300): Promise<SessionOption[]> {
   const open = await loadSqlite()
   const db = open(databasePath())

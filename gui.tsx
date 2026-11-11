@@ -1,5 +1,5 @@
 import { Command, Panel, Plugin } from "@opencode/plugin/gui"
-import { For, Show, createMemo, createSignal, onMount } from "solid-js"
+import { For, Show, createSignal, onMount } from "solid-js"
 import { GlobalSearch } from "./rpc.js"
 
 type Row = {
@@ -8,6 +8,13 @@ type Row = {
   role: string | null
   title: string | null
   excerpt: string
+}
+
+type Group = {
+  sid: string
+  title: string
+  count: number
+  last: number
 }
 
 function pad(n: number) {
@@ -43,7 +50,8 @@ export default Plugin.define({
     },
   },
   setup(ctx) {
-    const [results, setResults] = createSignal<Row[]>([])
+    const [groups, setGroups] = createSignal<Group[]>([])
+    const [snippets, setSnippets] = createSignal<Record<string, Row[]>>({})
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
@@ -52,22 +60,22 @@ export default Plugin.define({
     const [words, setWords] = createSignal(false)
     const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
 
-    const toggle = (sid: string) => setExpanded({ ...expanded(), [sid]: !expanded()[sid] })
-
-    const groups = createMemo(() => {
-      const map = new Map<string, { sid: string; title: string; count: number; last: number; rows: Row[] }>()
-      for (const r of results()) {
-        const found = map.get(r.sid)
-        if (found) {
-          found.count++
-          found.rows.push(r)
-          if (r.t > found.last) found.last = r.t
-        } else {
-          map.set(r.sid, { sid: r.sid, title: r.title, count: 1, last: r.t, rows: [r] })
-        }
+    const toggle = async (sid: string) => {
+      const open = !expanded()[sid]
+      setExpanded({ ...expanded(), [sid]: open })
+      if (!open || snippets()[sid]) return
+      try {
+        const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
+          query: text().trim(),
+          session: sid,
+          words: words(),
+          limit: 30,
+        })
+        setSnippets({ ...snippets(), [sid]: out?.results ?? [] })
+      } catch {
+        setSnippets({ ...snippets(), [sid]: [] })
       }
-      return [...map.values()].sort((a, b) => b.count - a.count || b.last - a.last)
-    })
+    }
 
     onMount(() => {
       void (async () => {
@@ -83,16 +91,17 @@ export default Plugin.define({
       if (!q) return
       setBusy(true)
       setTouched(true)
+      setSnippets({})
+      setExpanded({})
       try {
-        const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
+        const out: any = await (ctx.client as any).rpc(GlobalSearch).groups({
           query: q,
-          limit: 200,
           words: words(),
           ...(picked() ? { session: picked() } : {}),
         })
-        setResults(out?.results ?? [])
+        setGroups(out?.sessions ?? [])
       } catch {
-        setResults([])
+        setGroups([])
       } finally {
         setBusy(false)
       }
@@ -172,7 +181,7 @@ export default Plugin.define({
         </div>
 
         <div style={{ flex: "1", overflow: "auto", padding: "0 8px 8px", "min-height": "0" }}>
-          <Show when={results().length > 0} fallback={
+          <Show when={groups().length > 0} fallback={
             <div style={{ color: "#666", "font-size": "12px", padding: "12px 4px" }}>
               {touched() ? ctx.t("panel.none") : ctx.t("panel.empty")}
             </div>
@@ -209,7 +218,7 @@ export default Plugin.define({
                   </div>
                   <Show when={expanded()[g.sid]}>
                     <div style={{ "padding-bottom": "6px" }}>
-                      <For each={g.rows}>
+                      <For each={snippets()[g.sid] ?? []}>
                         {(r) => (
                           <div style={{ padding: "4px 2px 4px 20px" }}>
                             <div style={{ color: "#666", "font-size": "11px" }}>

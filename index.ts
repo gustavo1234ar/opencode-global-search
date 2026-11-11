@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin"
-import { searchRows, listSessions } from "./search.js"
+import { searchRows, listSessions, searchSessions } from "./search.js"
 import { GlobalSearch } from "./rpc.js"
 
 const ROLE_LABEL: Record<string, string> = {
@@ -106,6 +106,16 @@ export default Plugin.define({
         },
         sessions: async (input: any) => {
           const sessions = await listSessions(Math.min(Math.max(Number(input?.limit) || 300, 1), 1000))
+          return { sessions }
+        },
+        groups: async (input: any) => {
+          const sessions = await searchSessions({
+            query: String(input?.query ?? ""),
+            since: input?.since,
+            session: input?.session,
+            role: input?.role,
+            words: input?.words === true,
+          })
           return { sessions }
         },
       })
