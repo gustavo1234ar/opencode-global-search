@@ -59,6 +59,17 @@ export default Plugin.define({
       }
     }
 
+    const openSession = (sid: string) => {
+      try {
+        const servers = (ctx as any).servers
+        const ids: string[] = servers?.list?.() ?? []
+        const refs = ids.map((id) => servers.get(id)).filter(Boolean)
+        const server = refs.find((s: any) => s.builtin) ?? refs[0]
+        if (!server) return
+        ;(ctx as any).tabs.open({ server: server.id, id: sid }, { focus: true })
+      } catch {}
+    }
+
     const View = () => (
       <div style={{ display: "flex", "flex-direction": "column", height: "100%", "min-height": "0" }}>
         <div style={{ display: "flex", gap: "6px", padding: "8px" }}>
@@ -103,7 +114,10 @@ export default Plugin.define({
           }>
             <For each={results()}>
               {(r) => (
-                <div style={{ "border-bottom": "1px solid #262626", padding: "8px 2px" }}>
+                <div
+                  onClick={() => openSession(r.sid)}
+                  style={{ "border-bottom": "1px solid #262626", padding: "8px 2px", cursor: "pointer" }}
+                >
                   <div style={{ color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={r.sid}>
                     {r.title || "(untitled)"}
                   </div>
