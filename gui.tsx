@@ -35,6 +35,7 @@ export default Plugin.define({
       "panel.button": "Search",
       "panel.empty": "Type the exact phrase and press Enter.",
       "panel.none": "No matches.",
+      "panel.exact": "Exact match",
       "panel.hidden": "Match is inside tool output or reasoning, not in the visible text.",
     },
     es: {
@@ -44,6 +45,7 @@ export default Plugin.define({
       "panel.button": "Buscar",
       "panel.empty": "Escribí la frase exacta y Enter.",
       "panel.none": "Sin coincidencias.",
+      "panel.exact": "Coincidencia exacta",
       "panel.hidden": "La coincidencia está en la salida de una tool o en el razonamiento, no en el texto visible.",
     },
   },
@@ -53,6 +55,8 @@ export default Plugin.define({
     const [busy, setBusy] = createSignal(false)
     const [touched, setTouched] = createSignal(false)
     const [text, setText] = createSignal("")
+    const [exact, setExact] = createSignal(true)
+    const [lastQuery, setLastQuery] = createSignal("")
     const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
 
     const toggle = async (sid: string) => {
@@ -61,8 +65,9 @@ export default Plugin.define({
       if (!open || snippets()[sid]) return
       try {
         const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
-          query: text().trim(),
+          query: lastQuery(),
           session: sid,
+          words: !exact(),
           limit: 30,
         })
         setSnippets({ ...snippets(), [sid]: out?.results ?? [] })
@@ -78,9 +83,11 @@ export default Plugin.define({
       setTouched(true)
       setSnippets({})
       setExpanded({})
+      setLastQuery(q)
       try {
         const out: any = await (ctx.client as any).rpc(GlobalSearch).groups({
           query: q,
+          words: !exact(),
         })
         setGroups(out?.sessions ?? [])
       } catch {
@@ -99,6 +106,19 @@ export default Plugin.define({
         if (!server) return
         ;(ctx as any).tabs.open({ server: server.id, id: sid }, { focus: true })
       } catch {}
+    }
+
+    const pieces = (value: string) => {
+      const q = lastQuery().trim()
+      if (!q) return [{ text: value, hit: false }]
+      const terms = exact() ? [q] : q.split(/\s+/).filter(Boolean)
+      if (terms.length === 0) return [{ text: value, hit: false }]
+      const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+      const re = new RegExp(`(${escaped})`, "gi")
+      return value
+        .split(re)
+        .filter((part) => part !== "")
+        .map((part, i) => ({ text: part, hit: i % 2 === 1 }))
     }
 
     const View = () => (
@@ -135,6 +155,13 @@ export default Plugin.define({
           >
             {ctx.t("panel.button")}
           </button>
+        </div>
+
+        <div style={{ padding: "0 8px 8px" }}>
+          <label style={{ display: "flex", "align-items": "center", gap: "6px", color: "#555", "font-size": "12px" }}>
+            <input type="checkbox" checked={exact()} onChange={(e) => setExact(e.currentTarget.checked)} />
+            {ctx.t("panel.exact")}
+          </label>
         </div>
 
         <div style={{ flex: "1", overflow: "auto", padding: "0 8px 8px", "min-height": "0" }}>
@@ -181,7 +208,11 @@ export default Plugin.define({
                             <div style={{ color: "#666", "font-size": "11px" }}>
                               {date(r.t)} · {r.role ?? "?"}
                             </div>
-                            <div style={{ color: "#333333", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
+                            <div style={{ color: "#333333", "font-size": "12px", "line-height": "1.4" }}>
+                              <For each={pieces(r.excerpt)}>
+                                {(part) => <span style={part.hit ? { "font-weight": "700", color: "#111" } : {}}>{part.text}</span>}
+                              </For>
+                            </div>
                           </div>
                         )}
                       </For>

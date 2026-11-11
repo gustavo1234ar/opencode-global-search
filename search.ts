@@ -8,6 +8,7 @@ export type SearchInput = {
   session?: string
   role?: string
   limit?: number
+  words?: boolean
 }
 
 export type SearchRow = {
@@ -74,9 +75,14 @@ function visibleText(data: string, type: string | null): string {
 
 type Unit = { value: string; phrase: boolean }
 
-function parseQuery(query: string): Unit[] {
+function parseQuery(query: string, words = false): Unit[] {
   const trimmed = query.trim()
-  return trimmed ? [{ value: trimmed, phrase: true }] : []
+  if (!trimmed) return []
+  if (!words) return [{ value: trimmed, phrase: true }]
+  return trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((value) => ({ value, phrase: false }))
 }
 
 function termRegex(term: string) {
@@ -163,7 +169,7 @@ export async function searchSessions(input: SearchInput): Promise<SessionGroup[]
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const units = parseQuery(query)
+  const units = parseQuery(query, input.words === true)
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
 
@@ -272,7 +278,7 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
     if (Number.isNaN(sinceMs)) return []
   }
 
-  const units = parseQuery(query)
+  const units = parseQuery(query, input.words === true)
   if (units.length === 0) return []
   const patterns = units.map((u) => `%${u.value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
   const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
@@ -316,8 +322,13 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
                    ORDER BY m.time_created DESC LIMIT ?`
       const rows = db.prepare(sql).all(...params) as any[]
       return rows
-        .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
-        .filter((x) => matchesAll(x.text, units))
+        .map((r) => {
+          const text = visibleText(String(r.content), r.role)
+          const at = locate(text, units)
+          return { r, text, span: at ? at.span : -1 }
+        })
+        .filter((x) => x.span >= 0)
+        .sort((a, b) => (units.length > 1 ? a.span - b.span : 0) || b.r.t - a.r.t)
         .slice(0, top)
         .map((x) => ({
           t: x.r.t,
@@ -356,8 +367,13 @@ export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
                  ORDER BY p.time_created DESC LIMIT ?`
     const rows = db.prepare(sql).all(...params) as any[]
     return rows
-      .map((r) => ({ r, text: visibleText(String(r.content), r.role) }))
-      .filter((x) => matchesAll(x.text, units))
+      .map((r) => {
+        const text = visibleText(String(r.content), r.role)
+        const at = locate(text, units)
+        return { r, text, span: at ? at.span : -1 }
+      })
+      .filter((x) => x.span >= 0)
+      .sort((a, b) => (units.length > 1 ? a.span - b.span : 0) || b.r.t - a.r.t)
       .slice(0, top)
       .map((x) => ({
         t: x.r.t,

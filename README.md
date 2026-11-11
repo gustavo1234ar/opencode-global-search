@@ -52,7 +52,8 @@ Keep the panel and hide the tool from the agent:
 
 - **Global search** across every session and project.
 - **Exact phrase by default**, like the built-in `Ctrl+F`: `lenovo 14` matches only that sequence.
-- **Session scoping**: search one session or all of them.
+- **Exact match** on by default; untick it to match every word in any order.
+- Matches are ranked by how close the words are, and highlighted in the excerpt.
 - **Role filter** and date filter for the tool.
 
 ## Usage (tool)
