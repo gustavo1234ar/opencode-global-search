@@ -1,33 +1,6 @@
-import { homedir } from "node:os"
-import { join } from "node:path"
-import { existsSync } from "node:fs"
 import { Plugin } from "@opencode/plugin"
-
-function databasePath(): string {
-  const fromEnv = process.env.OPENCODE_DB
-  if (fromEnv && existsSync(fromEnv)) return fromEnv
-
-  const dataHome = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
-  return join(dataHome, "opencode", "opencode.db")
-}
-
-async function loadSqlite() {
-  try {
-    const mod: any = await import("node:sqlite")
-    return (path: string) => new mod.DatabaseSync(path, { readOnly: true })
-  } catch {
-    const mod: any = await import("bun:sqlite")
-    return (path: string) => new mod.Database(path, { readonly: true })
-  }
-}
-
-type Row = {
-  t: number
-  sid: string
-  role: string | null
-  title: string | null
-  content: string
-}
+import { searchRows } from "./search.js"
+import { GlobalSearch } from "./rpc.js"
 
 const ROLE_LABEL: Record<string, string> = {
   user: "user",
@@ -43,30 +16,9 @@ function formatDate(ms: number) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function clean(text: string) {
-  return text
-    .replace(/\\n/g, " ")
-    .replace(/\\r/g, " ")
-    .replace(/\\t/g, " ")
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, "\\")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function excerpt(data: string, term: string) {
-  const i = data.toLowerCase().indexOf(term.toLowerCase())
-  if (i < 0) return clean(data.slice(0, 240))
-  const start = Math.max(0, i - 140)
-  const end = Math.min(data.length, i + term.length + 160)
-  return `…${clean(data.slice(start, end))}…`
-}
-
 export default Plugin.define({
   id: "global-search",
   async setup(ctx) {
-    const open = await loadSqlite()
-
     await ctx.tool.transform((editor) => {
       editor.namespace({
         name: "global",
@@ -105,84 +57,13 @@ export default Plugin.define({
           const term = String(query ?? "").trim()
           if (!term) return { content: "Missing search term." }
 
-          let sinceMs: number | undefined
-          if (since) {
-            sinceMs = Date.parse(`${since}T00:00:00`)
-            if (Number.isNaN(sinceMs)) return { content: `Invalid date: ${since} (use YYYY-MM-DD).` }
-          }
-
-          const terms = term.split(/\s+/).filter(Boolean)
-          const patterns = terms.map((t) => `%${t.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
-          const top = Math.min(Math.max(Number(limit) || 20, 1), 100)
-
-          const db = open(databasePath())
-          let rows: Row[]
-          try {
-            const v2 = db
-              .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='session_message'")
-              .get()
-
-            const conditions: string[] = []
-            const params: any[] = []
-
-            if (v2) {
-              conditions.push(patterns.map(() => "m.data LIKE ? ESCAPE '\\'").join(" AND "))
-              params.push(...patterns)
-              if (sinceMs !== undefined) {
-                conditions.push("m.time_created >= ?")
-                params.push(sinceMs)
-              }
-              if (session) {
-                conditions.push("m.session_id = ?")
-                params.push(session)
-              }
-              if (role) {
-                conditions.push("m.type = ?")
-                params.push(role)
-              } else {
-                conditions.push("m.type IN ('user','assistant','synthetic','shell')")
-              }
-              params.push(top)
-
-              const sql = `SELECT m.time_created AS t, m.session_id AS sid, m.type AS role,
-                                  m.data AS content, s.title AS title
-                           FROM session_message m
-                           LEFT JOIN session_v2 s ON s.id = m.session_id
-                           WHERE ${conditions.join(" AND ")}
-                           ORDER BY m.time_created DESC LIMIT ?`
-              rows = db.prepare(sql).all(...params) as Row[]
-            } else {
-              conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
-              params.push(...patterns)
-              if (sinceMs !== undefined) {
-                conditions.push("p.time_created >= ?")
-                params.push(sinceMs)
-              }
-              if (session) {
-                conditions.push("p.session_id = ?")
-                params.push(session)
-              }
-              if (role) {
-                conditions.push("json_extract(m.data, '$.role') = ?")
-                params.push(role)
-              } else {
-                conditions.push("json_extract(m.data, '$.role') IN ('user','assistant')")
-              }
-              params.push(top)
-
-              const sql = `SELECT p.time_created AS t, p.session_id AS sid,
-                                  json_extract(m.data, '$.role') AS role,
-                                  p.data AS content, s.title AS title
-                           FROM part p
-                           JOIN message m ON m.id = p.message_id
-                           LEFT JOIN session s ON s.id = p.session_id
-                           WHERE ${conditions.join(" AND ")}
-                           ORDER BY p.time_created DESC LIMIT ?`
-              rows = db.prepare(sql).all(...params) as Row[]
-            }
-          } finally {
-            db.close()
-          }
+          const rows = await searchRows({
+            query: term,
+            since,
+            session,
+            role,
+            limit: Math.min(Number(limit) || 20, 100),
+          })
 
           if (rows.length === 0) return { content: `No matches for "${term}".` }
 
@@ -190,7 +71,7 @@ export default Plugin.define({
           const lines = rows.map((r) => {
             const who = ROLE_LABEL[r.role ?? ""] ?? r.role ?? "unknown"
             const title = (r.title ?? "(untitled)").replace(/\s+/g, " ").slice(0, 60)
-            return `${formatDate(r.t)} · ${title} · [${who}] · ${r.sid}\n   ${excerpt(r.content, terms[0])}`
+            return `${formatDate(r.t)} · ${title} · [${who}] · ${r.sid}\n   ${r.excerpt}`
           })
 
           return {
@@ -198,6 +79,19 @@ export default Plugin.define({
           }
         },
       })
+    })
+
+    await ctx.rpc.register(GlobalSearch, {
+      search: async (input: any) => {
+        const results = await searchRows({
+          query: String(input?.query ?? ""),
+          since: input?.since,
+          session: input?.session,
+          role: input?.role,
+          limit: Math.min(Math.max(Number(input?.limit) || 50, 1), 200),
+        })
+        return { results }
+      },
     })
   },
 })

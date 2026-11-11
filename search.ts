@@ -1,0 +1,154 @@
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { existsSync } from "node:fs"
+
+export type SearchInput = {
+  query: string
+  since?: string
+  session?: string
+  role?: string
+  limit?: number
+}
+
+export type SearchRow = {
+  t: number
+  sid: string
+  role: string | null
+  title: string | null
+  excerpt: string
+}
+
+function databasePath(): string {
+  const fromEnv = process.env.OPENCODE_DB
+  if (fromEnv && existsSync(fromEnv)) return fromEnv
+  const dataHome = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
+  return join(dataHome, "opencode", "opencode.db")
+}
+
+async function loadSqlite() {
+  try {
+    const mod: any = await import("node:sqlite")
+    return (path: string) => new mod.DatabaseSync(path, { readOnly: true })
+  } catch {
+    const mod: any = await import("bun:sqlite")
+    return (path: string) => new mod.Database(path, { readonly: true })
+  }
+}
+
+function clean(text: string) {
+  return text
+    .replace(/\\n/g, " ")
+    .replace(/\\r/g, " ")
+    .replace(/\\t/g, " ")
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, "\\")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function excerpt(data: string, term: string) {
+  const i = data.toLowerCase().indexOf(term.toLowerCase())
+  if (i < 0) return clean(data.slice(0, 240))
+  const start = Math.max(0, i - 140)
+  const end = Math.min(data.length, i + term.length + 160)
+  return `…${clean(data.slice(start, end))}…`
+}
+
+export async function searchRows(input: SearchInput): Promise<SearchRow[]> {
+  const query = String(input.query ?? "").trim()
+  if (!query) return []
+
+  let sinceMs: number | undefined
+  if (input.since) {
+    sinceMs = Date.parse(`${input.since}T00:00:00`)
+    if (Number.isNaN(sinceMs)) return []
+  }
+
+  const terms = query.split(/\s+/).filter(Boolean)
+  const patterns = terms.map((t) => `%${t.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+  const top = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
+
+  const open = await loadSqlite()
+  const db = open(databasePath())
+
+  try {
+    const v2 = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='session_message'")
+      .get()
+
+    const conditions: string[] = []
+    const params: any[] = []
+
+    if (v2) {
+      conditions.push(patterns.map(() => "m.data LIKE ? ESCAPE '\\'").join(" AND "))
+      params.push(...patterns)
+      if (sinceMs !== undefined) {
+        conditions.push("m.time_created >= ?")
+        params.push(sinceMs)
+      }
+      if (input.session) {
+        conditions.push("m.session_id = ?")
+        params.push(input.session)
+      }
+      if (input.role) {
+        conditions.push("m.type = ?")
+        params.push(input.role)
+      } else {
+        conditions.push("m.type IN ('user','assistant','synthetic','shell')")
+      }
+      params.push(top)
+
+      const sql = `SELECT m.time_created AS t, m.session_id AS sid, m.type AS role,
+                          m.data AS content, s.title AS title
+                   FROM session_message m
+                   LEFT JOIN session_v2 s ON s.id = m.session_id
+                   WHERE ${conditions.join(" AND ")}
+                   ORDER BY m.time_created DESC LIMIT ?`
+      const rows = db.prepare(sql).all(...params) as any[]
+      return rows.map((r) => ({
+        t: r.t,
+        sid: r.sid,
+        role: r.role,
+        title: r.title,
+        excerpt: excerpt(String(r.content), terms[0]),
+      }))
+    }
+
+    conditions.push(patterns.map(() => "p.data LIKE ? ESCAPE '\\'").join(" AND "))
+    params.push(...patterns)
+    if (sinceMs !== undefined) {
+      conditions.push("p.time_created >= ?")
+      params.push(sinceMs)
+    }
+    if (input.session) {
+      conditions.push("p.session_id = ?")
+      params.push(input.session)
+    }
+    if (input.role) {
+      conditions.push("json_extract(m.data, '$.role') = ?")
+      params.push(input.role)
+    } else {
+      conditions.push("json_extract(m.data, '$.role') IN ('user','assistant')")
+    }
+    params.push(top)
+
+    const sql = `SELECT p.time_created AS t, p.session_id AS sid,
+                        json_extract(m.data, '$.role') AS role,
+                        p.data AS content, s.title AS title
+                 FROM part p
+                 JOIN message m ON m.id = p.message_id
+                 LEFT JOIN session s ON s.id = p.session_id
+                 WHERE ${conditions.join(" AND ")}
+                 ORDER BY p.time_created DESC LIMIT ?`
+    const rows = db.prepare(sql).all(...params) as any[]
+    return rows.map((r) => ({
+      t: r.t,
+      sid: r.sid,
+      role: r.role,
+      title: r.title,
+      excerpt: excerpt(String(r.content), terms[0]),
+    }))
+  } finally {
+    db.close()
+  }
+}
