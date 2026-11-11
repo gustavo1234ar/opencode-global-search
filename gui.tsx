@@ -1,5 +1,5 @@
 import { Command, Panel, Plugin } from "@opencode/plugin/gui"
-import { For, Show, createSignal, onMount } from "solid-js"
+import { For, Show, createMemo, createSignal, onMount } from "solid-js"
 import { GlobalSearch } from "./rpc.js"
 
 type Row = {
@@ -50,6 +50,24 @@ export default Plugin.define({
     const [sessions, setSessions] = createSignal<{ id: string; title: string }[]>([])
     const [picked, setPicked] = createSignal("")
     const [words, setWords] = createSignal(false)
+    const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
+
+    const toggle = (sid: string) => setExpanded({ ...expanded(), [sid]: !expanded()[sid] })
+
+    const groups = createMemo(() => {
+      const map = new Map<string, { sid: string; title: string; count: number; last: number; rows: Row[] }>()
+      for (const r of results()) {
+        const found = map.get(r.sid)
+        if (found) {
+          found.count++
+          found.rows.push(r)
+          if (r.t > found.last) found.last = r.t
+        } else {
+          map.set(r.sid, { sid: r.sid, title: r.title, count: 1, last: r.t, rows: [r] })
+        }
+      }
+      return [...map.values()].sort((a, b) => b.count - a.count || b.last - a.last)
+    })
 
     onMount(() => {
       void (async () => {
@@ -68,7 +86,7 @@ export default Plugin.define({
       try {
         const out: any = await (ctx.client as any).rpc(GlobalSearch).search({
           query: q,
-          limit: 60,
+          limit: 200,
           words: words(),
           ...(picked() ? { session: picked() } : {}),
         })
@@ -159,19 +177,50 @@ export default Plugin.define({
               {touched() ? ctx.t("panel.none") : ctx.t("panel.empty")}
             </div>
           }>
-            <For each={results()}>
-              {(r) => (
-                <div
-                  onClick={() => openSession(r.sid)}
-                  style={{ "border-bottom": "1px solid rgba(128,128,128,0.30)", padding: "8px 2px", cursor: "pointer" }}
-                >
-                  <div style={{ color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={r.sid}>
-                    {r.title || "(untitled)"}
+            <For each={groups()}>
+              {(g) => (
+                <div style={{ "border-bottom": "1px solid rgba(128,128,128,0.30)" }}>
+                  <div
+                    onClick={() => openSession(g.sid)}
+                    style={{ display: "flex", "align-items": "center", gap: "6px", padding: "8px 2px", cursor: "pointer" }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggle(g.sid)
+                      }}
+                      style={{
+                        border: "0",
+                        background: "transparent",
+                        color: "#888",
+                        cursor: "pointer",
+                        "font-size": "11px",
+                        padding: "0 2px",
+                      }}
+                    >
+                      {expanded()[g.sid] ? "▾" : "▸"}
+                    </button>
+                    <span style={{ flex: "1", color: "#8ab", "font-size": "12px", "font-weight": "600" }} title={g.sid}>
+                      {g.title || "(untitled)"}
+                    </span>
+                    <span style={{ color: "#666", "font-size": "11px" }}>
+                      {g.count} · {date(g.last)}
+                    </span>
                   </div>
-                  <div style={{ color: "#666", "font-size": "11px" }}>
-                    {date(r.t)} · {r.role ?? "?"}
-                  </div>
-                  <div style={{ color: "#333333", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
+                  <Show when={expanded()[g.sid]}>
+                    <div style={{ "padding-bottom": "6px" }}>
+                      <For each={g.rows}>
+                        {(r) => (
+                          <div style={{ padding: "4px 2px 4px 20px" }}>
+                            <div style={{ color: "#666", "font-size": "11px" }}>
+                              {date(r.t)} · {r.role ?? "?"}
+                            </div>
+                            <div style={{ color: "#333333", "font-size": "12px", "line-height": "1.4" }}>{r.excerpt}</div>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>
