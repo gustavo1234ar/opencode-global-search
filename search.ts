@@ -154,8 +154,7 @@ function locate(text: string, units: Unit[]): { start: number; end: number; span
 }
 
 function matchesAll(text: string, units: Unit[]) {
-  const found = locate(text, units)
-  return found !== null && (units.length === 1 || found.span <= MAX_SPAN)
+  return locate(text, units) !== null
 }
 
 export type SessionOption = {
